@@ -1,0 +1,1 @@
+g++ -o pm3clock -lraylib -lcurl weather.cpp main.cpp
