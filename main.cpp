@@ -50,6 +50,9 @@ Texture2D image_to_texture(Image &img) {
     UnloadImage(img);
     return t;
 }
+Texture2D image_to_texture(Image &&img) {
+    return image_to_texture(img);
+}
 
 int main() {
     Weather::Gridpoint gp(latlong);
@@ -64,7 +67,9 @@ int main() {
         ToggleFullscreen();
     #endif
 
-    auto tx = LoadTextureFromImage(GenImageColor(800, 480, BLACK));
+    auto bottom_gradient = image_to_texture(GenImageGradientLinear(800, meta_sz+10, 0, Color{0,0,0,0}, BLACK));
+
+    auto tx = image_to_texture(GenImageColor(800, 480, BLACK));
     auto fc = Weather::Forecast { .image_url = "", .forecast_long = "Trying to get forecast..." };
     Image* new_img = nullptr;
     std::mutex new_img_mtx;
@@ -122,6 +127,7 @@ int main() {
             DrawTextEx(dm_sans, date, Vector2 { .x = (800 - MeasureTextEx(dm_sans, date, meta_sz, 0).x) / 2, .y = ctr_top+clock_sz }, meta_sz, 0, LIGHTGRAY);
             DrawTextEx(dm_sans, week, Vector2 { .x = (800 - MeasureTextEx(dm_sans, week, meta_sz, 0).x) / 2, .y = ctr_top+clock_sz+meta_sz }, meta_sz, 0, LIGHTGRAY);
             // draw scrolling forecast text
+            DrawTexture(bottom_gradient,0,480-meta_sz-10,WHITE);
             auto fct = fc.forecast_long.c_str();
             auto fctx = MeasureTextEx(dm_sans, fc.forecast_long.c_str(), meta_sz, 0).x;
 
@@ -130,7 +136,7 @@ int main() {
                 .x = fctx > 800 
                     ? static_cast<float>(800 - ((800 + fctx)*(std::fmod(GetTime() / (((fctx+1600)/800)*10), 1))))
                     : (800-fctx)/2, 
-                .y = 480 - meta_sz
+                .y = 480 - meta_sz - 10
             }, meta_sz, 0, LIGHTGRAY);
             
         EndDrawing();
