@@ -10,3 +10,4 @@
 #define meta_sz 40
 #define forecast_pad 10
 #define clock_pad 40
+#define zoom_factor 1.35f

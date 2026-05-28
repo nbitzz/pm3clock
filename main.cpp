@@ -108,9 +108,9 @@ int main() {
             std::srand(std::time(NULL));
             auto cam = cams[std::rand() % 10];
             auto i = load_image_from_url("https://cameras.alertcalifornia.org/public-camera-data/" + cam.id + "/latest-frame.jpg");
-            // trim about 25% off borders and resize
-            ImageResize(&i, i.width/(i.height/(480*1.25f)), (480*1.25f));
-            ImageCrop(&i, Rectangle{((i.width/(i.height/(480*1.25f))) - 800) / 2, 480*0.125,800,480});
+            // zoom
+            ImageResize(&i, i.width/(i.height/(480*zoom_factor)), (480*zoom_factor));
+            ImageCrop(&i, Rectangle{((i.width/(i.height/(480*zoom_factor))) - 800) / 2, 240*(zoom_factor-1),800,480});
             // overlay
             ImageDraw(&i, overlay, Rectangle{0,0,800,480}, Rectangle{0,0,800,480}, WHITE);
             new_img_mtx.lock();
