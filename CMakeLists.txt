@@ -7,6 +7,7 @@ target_sources(pm3clock
     PRIVATE
         main.cpp
         weather.cpp
+        alertca.cpp
 )
 target_link_libraries(pm3clock
     PRIVATE

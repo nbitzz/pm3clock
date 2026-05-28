@@ -9,9 +9,11 @@
 #include "thread"
 #include "chrono"
 #include "mutex"
+#include "alertca.hpp"
+#include "algorithm"
 
-const unsigned char dm_mono_buf[] = {
-    #embed "fonts/DMMono-Regular.ttf"
+const unsigned char dm_sans_extrabold_buf[] = {
+    #embed "fonts/DMSans-ExtraBold.ttf"
 };
 
 const unsigned char dm_sans_semibold_buf[] = {
@@ -19,7 +21,7 @@ const unsigned char dm_sans_semibold_buf[] = {
 };
 
 // use with Forecast
-Image load_image_from_url(std::string &url) {
+Image load_image_from_url(std::string url) {
     std::vector<unsigned char> data;
     CURL* hnd = curl_easy_init();
     curl_easy_setopt(hnd, CURLOPT_BUFFERSIZE, 102400L);
@@ -36,14 +38,6 @@ Image load_image_from_url(std::string &url) {
     return LoadImageFromMemory(".png", data.data(), data.size()); 
 }
 
-Image make_background_image(Image &img) {
-    ImageResize(&img, 800, 800);
-    ImageCrop(&img, Rectangle{0, 160, 800, 480});
-    ImageColorBrightness(&img, -127);
-    ImageBlurGaussian(&img, 10);
-    return img;
-}
-
 // convenience function
 Texture2D image_to_texture(Image &img) {
     auto t = LoadTextureFromImage(img);
@@ -55,48 +49,81 @@ Texture2D image_to_texture(Image &&img) {
 }
 
 int main() {
-    Weather::Gridpoint gp(latlong);
-    
     InitWindow(800, 480, "pm3clock");
     SetTargetFPS(fps);
-    auto dm_mono = LoadFontFromMemory(".ttf", dm_mono_buf, sizeof(dm_mono_buf), clock_sz, NULL, 0);
-    auto dm_sans = LoadFontFromMemory(".ttf", dm_sans_semibold_buf, sizeof(dm_sans_semibold_buf), meta_sz, NULL, 0);
+    auto clock_font = LoadFontFromMemory(".ttf", dm_sans_extrabold_buf, sizeof(dm_sans_semibold_buf), clock_sz, NULL, 0);
+    auto meta_font = LoadFontFromMemory(".ttf", dm_sans_semibold_buf, sizeof(dm_sans_semibold_buf), meta_sz, NULL, 0);
 
     #if fullscreen
     if (!IsWindowFullscreen())
         ToggleFullscreen();
     #endif
 
-    auto bottom_gradient = image_to_texture(GenImageGradientLinear(800, meta_sz+10, 0, Color{0,0,0,0}, BLACK));
-
     auto tx = image_to_texture(GenImageColor(800, 480, BLACK));
-    auto fc = Weather::Forecast { .image_url = "", .forecast_long = "Trying to get forecast..." };
-    Image* new_img = nullptr;
-    std::mutex new_img_mtx;
+    auto fc = Weather::Forecast { .image_url = "", .forecast_long = "Waiting for weather service..." };
 
-    auto t = std::thread([&fc, &new_img, &gp, &new_img_mtx]() {
+    // TODO: move these out into maybe another function at least or something
+    // this is a little too much for main()
+
+    auto weather_service = std::thread([&fc]() {
+        Weather::Gridpoint gp(current_latitude, current_longitude);
         while (!WindowShouldClose()) {
-            auto new_fc = gp.forecast();
-            // update background when needed
-            if (fc.image_url != new_fc.image_url) {
-                auto i = load_image_from_url(new_fc.image_url);
-                make_background_image(i);
-
-                // this feels dumb LOL
-                // but i think this is the best way to copy it out
-                // maybe i could see if i could move?
-                const std::lock_guard guard(new_img_mtx);
-                new_img = new Image(i);
-            }
-            fc = new_fc; // maybe i should use a mutex for this too but i'm lazy. i think it's less of an issue
+            fc = gp.forecast(); // maybe i should use a mutex for this too but i'm lazy. i think it's less of an issue
             using namespace std::chrono;
             std::this_thread::sleep_for(weather_refresh_time); // lol ts is not closing
         }
     });
 
+    Image* new_img = nullptr;
+    std::mutex new_img_mtx;
+    auto wildlife_photo_service = std::thread([&new_img, &new_img_mtx]() {
+        // first get cams and sort by nearest
+        auto cams = AlertCA::getCameras();
+        std::sort(cams.begin(), cams.end(), [](AlertCA::Camera &a, AlertCA::Camera &b) {
+            const auto distance_a = std::sqrtf(std::powf(a.latitude - current_latitude, 2) + std::powf(a.longitude - current_longitude, 2));
+            const auto distance_b = std::sqrtf(std::powf(b.latitude - current_latitude, 2) + std::powf(b.longitude - current_longitude, 2));
+            return distance_b > distance_a;
+        });
+        // generate our background to be laid on top of the image
+        auto overlay = GenImageColor(800, 480, Color{0,0,0,0});
+        // left side
+        ImageDrawRectangle(&overlay, 0, 0, 400, 480, Color{0,0,0,200});
+        ImageDraw(
+            &overlay,
+            GenImageGradientLinear(400, 480, 90, Color{0,0,0,200}, Color{0,0,0,0}),
+            Rectangle{0,0,400,480},
+            Rectangle{400,0,400,480},
+            WHITE
+        );
+        // bottom scrolling forecast area
+        ImageDraw(
+            &overlay,
+            GenImageGradientLinear(800, meta_sz+forecast_pad, 0, Color{0,0,0,0}, BLACK),
+            Rectangle{0,0,800,meta_sz+forecast_pad},
+            Rectangle{0,480-meta_sz-forecast_pad,800,meta_sz+forecast_pad},
+            WHITE
+        );
+        while (!WindowShouldClose()) {
+            // fetch image
+            std::srand(std::time(NULL));
+            auto cam = cams[std::rand() % 10];
+            auto i = load_image_from_url("https://cameras.alertcalifornia.org/public-camera-data/" + cam.id + "/latest-frame.jpg");
+            // trim about 25% off borders and resize
+            ImageResize(&i, i.width/(i.height/(480*1.25f)), (480*1.25f));
+            ImageCrop(&i, Rectangle{((i.width/(i.height/(480*1.25f))) - 800) / 2, 480*0.125,800,480});
+            // overlay
+            ImageDraw(&i, overlay, Rectangle{0,0,800,480}, Rectangle{0,0,800,480}, WHITE);
+            new_img_mtx.lock();
+            new_img = new Image(i);
+            new_img_mtx.unlock();
+            using namespace std::chrono;
+            std::this_thread::sleep_for(photo_refresh_time); // lol ts is not closing
+        }
+    });
+
     while (!WindowShouldClose()) {
         BeginDrawing();
-            ClearBackground(BLACK);
+            ClearBackground(WHITE);
             if (new_img_mtx.try_lock()) {
                 // need to load textures in main thread
                 if (new_img != nullptr) {
@@ -113,7 +140,7 @@ int main() {
             // drawing clock
             auto t = std::time(NULL);
             char time[10];
-            std::strftime(time, 10, "%H %M %S", std::localtime(&t));
+            std::strftime(time, 10, "%H:%M:%S", std::localtime(&t));
             char date[20];
             std::strftime(date, 20, "%A, %B %d", std::localtime(&t));
             char week[10];
@@ -122,27 +149,50 @@ int main() {
             const auto ctr_top = (480-(clock_sz+(meta_sz*2)))/2;
 
             // yuck
-            DrawTextEx(dm_mono, time, Vector2 { .x = (800 - MeasureTextEx(dm_mono, time, clock_sz, 0).x) / 2, .y = ctr_top }, clock_sz, 0, WHITE);
-            DrawTextEx(dm_mono, "  :  :  ", Vector2 { .x = (800 - MeasureTextEx(dm_mono, time, clock_sz, 0).x) / 2, .y = ctr_top }, clock_sz, 0, t % 2 == 0 ? LIGHTGRAY : GRAY);
-            DrawTextEx(dm_sans, date, Vector2 { .x = (800 - MeasureTextEx(dm_sans, date, meta_sz, 0).x) / 2, .y = ctr_top+clock_sz }, meta_sz, 0, LIGHTGRAY);
-            DrawTextEx(dm_sans, week, Vector2 { .x = (800 - MeasureTextEx(dm_sans, week, meta_sz, 0).x) / 2, .y = ctr_top+clock_sz+meta_sz }, meta_sz, 0, LIGHTGRAY);
+            // draw the clock by iterating over each character
+            // because it otherwise looks like shit
+            auto cell_sz = GetGlyphInfo(clock_font, '0').advanceX;
+            auto align_offset = ((cell_sz - GetGlyphInfo(clock_font, *std::begin(time)).advanceX) / 2);
+            for (auto p = std::begin(time); p < std::end(time); p++) {
+                if (*p == 0) break; // break on nul
+                auto width = GetGlyphInfo(clock_font, *p).advanceX;
+                DrawTextCodepoint(
+                    clock_font,
+                    *p,
+                    Vector2{
+                        .x = static_cast<float>(
+                            clock_pad // adds padding to left of clock
+                            + ((cell_sz - width) / 2) // centers the number in the "cell"
+                            + ((p-std::begin(time)) * cell_sz) // moves the number to where it should be
+                            - align_offset // minus the left pad for the first number
+                        ),
+                        .y = ctr_top
+                    },
+                    clock_sz,
+                    *p == ':'
+                    ? (t % 2 == 0 ? LIGHTGRAY : GRAY)
+                    : WHITE
+                );
+            }
+            DrawTextEx(meta_font, date, Vector2 { .x = clock_pad, .y = ctr_top+clock_sz }, meta_sz, 0, LIGHTGRAY);
+            DrawTextEx(meta_font, week, Vector2 { .x = clock_pad, .y = ctr_top+clock_sz+meta_sz }, meta_sz, 0, LIGHTGRAY);
             // draw scrolling forecast text
-            DrawTexture(bottom_gradient,0,480-meta_sz-10,WHITE);
             auto fct = fc.forecast_long.c_str();
-            auto fctx = MeasureTextEx(dm_sans, fc.forecast_long.c_str(), meta_sz, 0).x;
+            auto fctx = MeasureTextEx(meta_font, fc.forecast_long.c_str(), meta_sz, 0).x;
 
             // we only need to make it scroll if it's too wide
-            DrawTextEx(dm_sans, fct, Vector2 { 
+            DrawTextEx(meta_font, fct, Vector2 { 
                 .x = fctx > 800 
                     ? static_cast<float>(800 - ((800 + fctx)*(std::fmod(GetTime() / (((fctx+1600)/800)*10), 1))))
                     : (800-fctx)/2, 
-                .y = 480 - meta_sz - 10
+                .y = 480 - meta_sz - forecast_pad
             }, meta_sz, 0, LIGHTGRAY);
             
         EndDrawing();
     }
 
-    t.join();
+    weather_service.join();
+    wildlife_photo_service.join();
     CloseWindow();
 
     return 0;
