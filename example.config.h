@@ -11,3 +11,5 @@
 #define forecast_pad 10
 #define clock_pad 40
 #define zoom_factor 1.35f
+// if undefined pick random from 10 closest cams
+// #define force_cam_id "Axis-DeerCanyon2"

@@ -105,9 +105,13 @@ int main() {
         );
         while (!WindowShouldClose()) {
             // fetch image
-            std::srand(std::time(NULL));
-            auto cam = cams[std::rand() % 10];
-            auto i = load_image_from_url("https://cameras.alertcalifornia.org/public-camera-data/" + cam.id + "/latest-frame.jpg");
+            #if defined(force_cam_id)
+                auto i = load_image_from_url("https://cameras.alertcalifornia.org/public-camera-data/" + std::string(force_cam_id) + "/latest-frame.jpg");
+            #else
+                std::srand(std::time(NULL));
+                auto cam = cams[std::rand() % 10];
+                auto i = load_image_from_url("https://cameras.alertcalifornia.org/public-camera-data/" + cam.id + "/latest-frame.jpg");
+            #endif
             // zoom
             ImageResize(&i, i.width/(i.height/(480*zoom_factor)), (480*zoom_factor));
             ImageCrop(&i, Rectangle{((i.width/(i.height/(480*zoom_factor))) - 800) / 2, 240*(zoom_factor-1),800,480});
