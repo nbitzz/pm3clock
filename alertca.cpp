@@ -23,6 +23,7 @@ namespace AlertCA {
         curl_easy_setopt(hnd, CURLOPT_WRITEDATA, &data);
         curl_easy_setopt(hnd, CURLOPT_WRITEFUNCTION, curl_string_wf);
         curl_easy_perform(hnd);
+        curl_easy_cleanup(hnd);
 
         std::smatch m;
         std::vector<Camera> cams;

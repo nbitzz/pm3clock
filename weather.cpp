@@ -29,6 +29,7 @@ namespace Weather {
         curl_easy_setopt(hnd, CURLOPT_WRITEFUNCTION, curl_string_wf);
         
         curl_easy_perform(hnd);
+        curl_easy_cleanup(hnd);
         auto buf = data.c_str();
         std::cmatch m;
         std::regex_search(buf, m, regex::grid_posn);
@@ -57,6 +58,7 @@ namespace Weather {
         curl_easy_setopt(hnd, CURLOPT_WRITEFUNCTION, curl_string_wf);
         
         curl_easy_perform(hnd);
+        curl_easy_cleanup(hnd);
         auto buf = data.c_str();
         std::cmatch m;
         bool success = std::regex_search(buf, m, regex::forecast_and_url);

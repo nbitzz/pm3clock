@@ -35,6 +35,7 @@ Image load_image_from_url(std::string url) {
     curl_easy_setopt(hnd, CURLOPT_WRITEFUNCTION, curl_vec_wf);
     
     curl_easy_perform(hnd);
+    curl_easy_cleanup(hnd);
     return LoadImageFromMemory(".png", data.data(), data.size()); 
 }
 
@@ -59,7 +60,10 @@ int main() {
         ToggleFullscreen();
     #endif
 
-    auto tx = image_to_texture(GenImageColor(800, 480, BLACK));
+    // update image format so we can just UpdateTexture() with new image data
+    auto i_default = GenImageColor(800, 480, BLACK);
+    ImageFormat(&i_default, PIXELFORMAT_UNCOMPRESSED_R8G8B8);
+    auto tx = image_to_texture(i_default);
     auto fc = Weather::Forecast { .image_url = "", .forecast_long = "Waiting for weather service..." };
 
     // TODO: move these out into maybe another function at least or something
@@ -123,7 +127,10 @@ int main() {
             // overlay
             ImageDraw(&i, overlay, Rectangle{0,0,800,480}, Rectangle{0,0,800,480}, WHITE);
             new_img_mtx.lock();
-            new_img = new Image(i);
+            new_img = new Image(i); // although &i seemed to work
+                                    // i think it's only because free() isn't called until
+                                    // after sleep_for so a race condition where it segfaults
+                                    // could happen i think
             new_img_mtx.unlock();
             using namespace std::chrono;
             std::this_thread::sleep_for(photo_refresh_time); // lol ts is not closing
@@ -132,12 +139,12 @@ int main() {
 
     while (!WindowShouldClose()) {
         BeginDrawing();
-            ClearBackground(WHITE);
+            ClearBackground(BLACK);
             if (new_img_mtx.try_lock()) {
                 // need to load textures in main thread
                 if (new_img != nullptr) {
-                    UnloadTexture(tx);
-                    tx = image_to_texture(*new_img);
+                    UpdateTexture(tx, new_img->data);
+                    UnloadImage(*new_img);
                     delete new_img;
                     new_img = nullptr;
                 }
