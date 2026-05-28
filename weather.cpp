@@ -59,11 +59,14 @@ namespace Weather {
         curl_easy_perform(hnd);
         auto buf = data.c_str();
         std::cmatch m;
-        std::regex_search(buf, m, regex::forecast_and_url);
-        return Forecast {
-            // replace medium with large
-            .image_url = m[1].str().replace(m[1].str().size()-6, 6, "large"),
-            .forecast_long = m[2].str()
-        };
+        bool success = std::regex_search(buf, m, regex::forecast_and_url);
+        if (success)
+            return Forecast {
+                // replace medium with large
+                .image_url = m[1].str().replace(m[1].str().size()-6, 6, "large"),
+                .forecast_long = m[2].str()
+            };
+        else
+            return Forecast{"","Failed to contact weather service"};
     }
 }
