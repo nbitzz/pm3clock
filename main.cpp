@@ -77,6 +77,7 @@ int main() {
     Image* new_img = nullptr;
     std::mutex new_img_mtx;
     auto wildlife_photo_service = std::thread([&new_img, &new_img_mtx]() {
+        std::srand(std::time(NULL));
         // first get cams and sort by nearest
         auto cams = AlertCA::getCameras();
         std::sort(cams.begin(), cams.end(), [](AlertCA::Camera &a, AlertCA::Camera &b) {
@@ -108,8 +109,12 @@ int main() {
             #if defined(force_cam_id)
                 auto i = load_image_from_url("https://cameras.alertcalifornia.org/public-camera-data/" + std::string(force_cam_id) + "/latest-frame.jpg");
             #else
-                std::srand(std::time(NULL));
-                auto cam = cams[std::rand() % 10];
+                #if cam_selection_mode == 0
+                    auto cam = cams[std::rand() % cam_pool];
+                #elif cam_selection_mode == 1
+                    auto now = std::time(NULL);
+                    auto cam = cams[(std::localtime(&now)->tm_yday) % cam_pool];
+                #endif
                 auto i = load_image_from_url("https://cameras.alertcalifornia.org/public-camera-data/" + cam.id + "/latest-frame.jpg");
             #endif
             // zoom
