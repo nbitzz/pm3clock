@@ -49,6 +49,16 @@ Texture2D image_to_texture(Image &&img) {
     return image_to_texture(img);
 }
 
+template<class T>
+void interruptable_wait(T t) {
+    using namespace std::chrono;
+    using namespace std::this_thread;
+    const auto end = steady_clock::now() + t;
+    while (steady_clock::now() < end && !WindowShouldClose()) {
+        sleep_for(milliseconds(5));
+    }
+}
+
 int main() {
     InitWindow(800, 480, "pm3clock");
     SetTargetFPS(fps);
@@ -74,7 +84,7 @@ int main() {
         while (!WindowShouldClose()) {
             fc = gp.forecast(); // maybe i should use a mutex for this too but i'm lazy. i think it's less of an issue
             using namespace std::chrono;
-            std::this_thread::sleep_for(weather_refresh_time); // lol ts is not closing
+            interruptable_wait(weather_refresh_time); // lol ts is not closing
         }
     });
 
@@ -133,7 +143,7 @@ int main() {
                                     // could happen i think
             new_img_mtx.unlock();
             using namespace std::chrono;
-            std::this_thread::sleep_for(photo_refresh_time); // lol ts is not closing
+            interruptable_wait(photo_refresh_time); // lol ts is not closing
         }
     });
 
@@ -207,9 +217,9 @@ int main() {
         EndDrawing();
     }
 
+    CloseWindow();
     weather_service.join();
     wildlife_photo_service.join();
-    CloseWindow();
 
     return 0;
 }
