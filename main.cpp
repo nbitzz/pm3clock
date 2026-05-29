@@ -39,16 +39,6 @@ Image load_image_from_url(std::string url) {
     return LoadImageFromMemory(".jpg", data.data(), data.size()); 
 }
 
-// convenience function
-Texture2D image_to_texture(Image &img) {
-    auto t = LoadTextureFromImage(img);
-    UnloadImage(img);
-    return t;
-}
-Texture2D image_to_texture(Image &&img) {
-    return image_to_texture(img);
-}
-
 template<class T>
 void interruptable_wait(T t) {
     using namespace std::chrono;
@@ -70,10 +60,18 @@ int main() {
         ToggleFullscreen();
     #endif
 
-    // update image format so we can just UpdateTexture() with new image data
+    // update image format so we can just UpdateTexture() with new image data later
     auto i_default = GenImageColor(800, 480, BLACK);
     ImageFormat(&i_default, PIXELFORMAT_UNCOMPRESSED_R8G8B8);
-    auto tx = image_to_texture(i_default);
+
+    auto tx = LoadTextureFromImage(i_default);
+    struct {
+        std::chrono::steady_clock::time_point since;
+        Texture2D tx;
+        bool transition_complete = true;
+    } incoming_tx; // for transitions
+    incoming_tx.tx = LoadTextureFromImage(i_default);
+    
     auto fc = Weather::Forecast { .image_url = "", .forecast_long = "Waiting for weather service..." };
 
     // TODO: move these out into maybe another function at least or something
@@ -153,7 +151,9 @@ int main() {
             if (new_img_mtx.try_lock()) {
                 // need to load textures in main thread
                 if (new_img != nullptr) {
-                    UpdateTexture(tx, new_img->data);
+                    UpdateTexture(incoming_tx.tx, new_img->data);
+                    incoming_tx.since = std::chrono::steady_clock::now();
+                    incoming_tx.transition_complete = false;
                     UnloadImage(*new_img);
                     delete new_img;
                     new_img = nullptr;
@@ -162,7 +162,18 @@ int main() {
             }
 
             DrawTexture(tx, 0, 0, WHITE);
-
+            if (!incoming_tx.transition_complete) {
+                using namespace std::chrono;
+                // this api's kinda weird man
+                duration<double> t = steady_clock::now()-incoming_tx.since;
+                if (t < transition_time)
+                    DrawTexture(incoming_tx.tx, 0, 0, Color{255,255,255,static_cast<unsigned char>(255*(t/transition_time))});
+                else {
+                    std::swap(tx, incoming_tx.tx); // this is kinda dumb but it should work lol
+                    DrawTexture(tx, 0, 0, WHITE); // draw the background texture again because we already drew the old one
+                    incoming_tx.transition_complete = true;
+                }
+            }
             // drawing clock
             auto t = std::time(NULL);
             char time[10];
