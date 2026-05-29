@@ -36,7 +36,7 @@ Image load_image_from_url(std::string url) {
     
     curl_easy_perform(hnd);
     curl_easy_cleanup(hnd);
-    return LoadImageFromMemory(".png", data.data(), data.size()); 
+    return LoadImageFromMemory(".jpg", data.data(), data.size()); 
 }
 
 // convenience function

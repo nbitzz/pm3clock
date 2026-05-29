@@ -5,11 +5,16 @@ little practice project to learn C++—a clock made with raylib and curl. backgr
 
 ## building
 > [!IMPORTANT]
-> raylib and curl are dynamically linked, install separately on system
+> curl is dynamically linked, install separately on system
 
 first, copy [`example.config.h`](/example.config.h) into a new `config.h` file and adjust the preprocessor directives as you wish. **latlong must be specified!**
 
 after, you can build the application with
 ```sh
-mkdir -p build && cmake -B build && make -C build
+mkdir -p build && cmake -B build -DPLATFORM=DESKTOP - && make -C build
 ```
+for testing and 
+```sh
+mkdir -p build && cmake -B build -DPLATFORM=DRM && make -C build
+```
+to run on the pm3
