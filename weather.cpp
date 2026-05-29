@@ -30,9 +30,8 @@ namespace Weather {
         
         curl_easy_perform(hnd);
         curl_easy_cleanup(hnd);
-        auto buf = data.c_str();
-        std::cmatch m;
-        std::regex_search(buf, m, regex::grid_posn);
+        std::smatch m;
+        std::regex_search(data, m, regex::grid_posn);
 
         this->position = GridPosition {
             .office_id = m[1].str(),
@@ -59,9 +58,8 @@ namespace Weather {
         
         curl_easy_perform(hnd);
         curl_easy_cleanup(hnd);
-        auto buf = data.c_str();
-        std::cmatch m;
-        bool success = std::regex_search(buf, m, regex::forecast_and_url);
+        std::smatch m;
+        bool success = std::regex_search(data, m, regex::forecast_and_url);
         if (success)
             return Forecast {
                 // replace medium with large
