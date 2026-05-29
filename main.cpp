@@ -135,11 +135,18 @@ int main() {
             // overlay
             ImageDraw(&i, overlay, Rectangle{0,0,800,480}, Rectangle{0,0,800,480}, WHITE);
             new_img_mtx.lock();
-            new_img = new Image(i); // although &i seemed to work
-                                    // i think it's only because free() isn't called until
-                                    // after sleep_for so a race condition where it segfaults
-                                    // could happen i think
+            
+            // check that new_img isn't nullptr just in case this service manages to
+            // lock new_img_mtx again before the renderer can consume it
+            if (new_img != nullptr) {
+                UnloadImage(*new_img);
+                *new_img = i;
+            } else new_img = new Image(i);  // although &i seemed to work
+                                            // i think it's only because free() isn't called until
+                                            // after sleep_for so a race condition where it segfaults
+                                            // could happen i think
             new_img_mtx.unlock();
+
             using namespace std::chrono;
             interruptable_wait(photo_refresh_time); // lol ts is not closing
         }
