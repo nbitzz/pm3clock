@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.23)
 project(pm3clock)
 include(FetchContent)
-option(PM3_LIBRARIES "Path to PM3 libraries")
+option(PM3 "Enable software rendering to /dev/fb0 in raylib" OFF)
 
 # include font files
 function(include_bin p varname)
@@ -16,20 +16,13 @@ include_bin("./fonts/DMSans-SemiBold.ttf" dm_sans_semibold_buf)
 
 add_subdirectory(raylib)
 
-if (DEFINED PM3_LIBRARIES)
-    set(PLATFORM DRM)
-    set(CMAKE_C_COMPILER arm-linux-gnueabihf-gcc)
-    set(CMAKE_CXX_COMPILER arm-linux-gnueabihf-g++)
-    set(PC_CURL_INCLUDE_DIRS ${PM3_LIBRARIES})
-    string(REGEX MATCH "/?([^/]*)/?$" L_DIR_NAME ${PM3_LIBRARIES})
-    # todo maybe actually look for ld
-    add_link_options("-Wl,--dynamic-linker=/init/efad/mp_sd/${CMAKE_MATCH_1}/ld-linux-armhf.so.3")
+if (PM3)
     target_compile_definitions(raylib
         PUBLIC
             # AlertCA uses jpgs not png
             SUPPORT_FILEFORMAT_JPG=1
             GRAPHICS_API_OPENGL_SOFTWARE=1
-            DEFAULT_GRAPHIC_DEVICE_DRM="/dev/fd0"
+            DEFAULT_GRAPHIC_DEVICE_DRM="/dev/fb0"
     )
 else()
     target_compile_definitions(raylib
