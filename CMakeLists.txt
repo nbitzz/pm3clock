@@ -16,12 +16,7 @@ find_package(CURL)
 
 # compile raylib
 
-FetchContent_Declare(raylib
-    PREFIX raylib
-    GIT_REPOSITORY https://github.com/raysan5/raylib.git
-)
-
-FetchContent_MakeAvailable(raylib)
+add_subdirectory(raylib)
 
 target_compile_definitions(raylib
     PUBLIC
