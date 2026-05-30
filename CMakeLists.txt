@@ -1,7 +1,20 @@
 cmake_minimum_required(VERSION 3.23)
 project(pm3clock)
 include(FetchContent)
+
+# include font files
+function(include_bin p varname)
+    file(READ ${p} binh HEX)
+    string(REGEX REPLACE "([a-f0-9][a-f0-9])" "0x\\1," bint ${binh})
+    file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/${varname}.h" "unsigned char ${varname}[] = { ${bint} };")
+endfunction()
+
+include_bin("./fonts/DMSans-ExtraBold.ttf" dm_sans_extrabold_buf)
+include_bin("./fonts/DMSans-SemiBold.ttf" dm_sans_semibold_buf)
+
 find_package(CURL)
+
+# compile raylib
 
 FetchContent_Declare(raylib
     PREFIX raylib

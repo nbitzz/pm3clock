@@ -11,14 +11,8 @@
 #include "mutex"
 #include "alertca.hpp"
 #include "algorithm"
-
-const unsigned char dm_sans_extrabold_buf[] = {
-    #embed "fonts/DMSans-ExtraBold.ttf"
-};
-
-const unsigned char dm_sans_semibold_buf[] = {
-    #embed "fonts/DMSans-SemiBold.ttf"
-};
+#include "build/dm_sans_extrabold_buf.h"
+#include "build/dm_sans_semibold_buf.h"
 
 // use with Forecast
 Image load_image_from_url(std::string url) {
@@ -52,7 +46,7 @@ void interruptable_wait(T t) {
 int main() {
     InitWindow(800, 480, "pm3clock");
     SetTargetFPS(fps);
-    auto clock_font = LoadFontFromMemory(".ttf", dm_sans_extrabold_buf, sizeof(dm_sans_semibold_buf), clock_sz, NULL, 0);
+    auto clock_font = LoadFontFromMemory(".ttf", dm_sans_extrabold_buf, sizeof(dm_sans_extrabold_buf), clock_sz, NULL, 0);
     auto meta_font = LoadFontFromMemory(".ttf", dm_sans_semibold_buf, sizeof(dm_sans_semibold_buf), meta_sz, NULL, 0);
 
     #if fullscreen
@@ -93,8 +87,8 @@ int main() {
         // first get cams and sort by nearest
         auto cams = AlertCA::getCameras();
         std::sort(cams.begin(), cams.end(), [](AlertCA::Camera &a, AlertCA::Camera &b) {
-            const auto distance_a = std::sqrtf(std::powf(a.latitude - current_latitude, 2) + std::powf(a.longitude - current_longitude, 2));
-            const auto distance_b = std::sqrtf(std::powf(b.latitude - current_latitude, 2) + std::powf(b.longitude - current_longitude, 2));
+            const auto distance_a = std::sqrt(std::pow(a.latitude - current_latitude, 2) + std::pow(a.longitude - current_longitude, 2));
+            const auto distance_b = std::sqrt(std::pow(b.latitude - current_latitude, 2) + std::pow(b.longitude - current_longitude, 2));
             return distance_b > distance_a;
         });
         // generate our background to be laid on top of the image
